@@ -1,8 +1,19 @@
 import React from "react";
-import { Button, message, Modal, Table, type TableProps } from "antd";
+import {
+  Button,
+  message,
+  Popconfirm,
+  Table,
+  type TableProps,
+  Modal,
+} from "antd";
 import { useGetProducts } from "./service/query/useGetProduct";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDeleteProduct } from "./service/mutation/useDeleteProduct";
+import { useGetCategoryes } from "../catogoryes/service/query/useGetCategoryes";
+import { useToggle } from "../../hooks/useToggle";
+import { ProductForm } from "./components/product-form";
+import ErrorBoundary from "./service/ErrorBoundary";
 
 interface Product {
   id: string;
@@ -10,8 +21,13 @@ interface Product {
   price: number;
   count: number;
   description: string;
-  category: string;
-  color: string;
+  category: string | { id: string; name: string };
+  colorId: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 interface DataType {
@@ -20,15 +36,25 @@ interface DataType {
   price: number;
   count: number;
   description: string;
-  category: string;
-  color: string;
+  categoryId: string;
+  colorId: string;
 }
 
 export const Products: React.FC = () => {
   const { data, isLoading, error } = useGetProducts();
+  const {
+    data: categoryList,
+    isLoading: isLoading2,
+    error: error2,
+  } = useGetCategoryes();
   const queryClient = useQueryClient();
   const { mutate } = useDeleteProduct();
-  console.log(data);
+  const { isOpen, open, close } = useToggle();
+  const [editingProduct, setEditingProduct] = React.useState<
+    DataType | undefined
+  >(undefined);
+
+  const categories = categoryList?.data;
 
   const dataSource: DataType[] =
     data?.map((item: Product) => ({
@@ -37,22 +63,23 @@ export const Products: React.FC = () => {
       price: item.price,
       count: item.count,
       description: item.description,
-      category: item.category,
+      categoryId:
+        typeof item.category === "object" ? item.category.id : item.category,
+      colorId: item.colorId,
     })) || [];
 
   const deleteProduct = (id: string) => {
-    Modal.confirm({
-      title: "Are you sure you want to delete this product?",
-      onOk: () =>
-        mutate(id, {
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["products"] });
-            message.success("Product deleted successfully");
-          },
-          onError: () => {
-            message.error("Failed to delete product");
-          },
-        }),
+    mutate(id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        message.success("Mahsulot muvaffaqiyatli o'chirildi");
+      },
+      onError: (error: any) => {
+        console.error("Delete error:", error);
+        message.error(
+          `Mahsulotni o'chirishda xato: ${error.message || "Noma'lum xato"}`
+        );
+      },
     });
   };
 
@@ -73,43 +100,69 @@ export const Products: React.FC = () => {
       title: "Count",
       dataIndex: "count",
       key: "count",
-      render: (count) => `${count}`,
     },
     {
       title: "Description",
       dataIndex: "description",
       key: "description",
-      render: (description) => `${description}`,
     },
     {
       title: "Category",
-      dataIndex: "category",
-      key: "category",
+      dataIndex: "categoryId",
+      key: "categoryId",
+      render: (categoryId: string) => {
+        if (isLoading2) return "Yuklanmoqda...";
+        if (error2 || !categories) return "Kategoriya yuklanmadi";
+        const category = categories?.find(
+          (cat: Category) => String(cat.id) === String(categoryId)
+        );
+        return category
+          ? category.name
+          : `Noma'lum kategoriya (ID: ${categoryId})`;
+      },
     },
     {
       title: "Color",
-      dataIndex: "color",
-      key: "color",
+      dataIndex: "colorId",
+      key: "colorId",
     },
     {
       title: "Action",
-      render: (data: any) => {
-        return (
-          <div>
-            <Button onClick={() => deleteProduct(data.key as string)}>
-              Delete
-            </Button>
-            <Button>Edit</Button>
-          </div>
-        );
-      },
+      render: (_text, record: DataType) => (
+        <div>
+          <Popconfirm
+            title="Mahsulotni o'chirish"
+            description="Haqiqatan ham o'chirmoqchimisiz?"
+            onConfirm={() => deleteProduct(record.key)}
+            okText="Ha"
+            cancelText="Yo'q"
+          >
+            <Button>Delete</Button>
+          </Popconfirm>
+          <Button
+            onClick={() => {
+              setEditingProduct(record);
+              open();
+            }}
+          >
+            Edit
+          </Button>
+        </div>
+      ),
     },
   ];
 
-  if (isLoading) return <div className="text-center p-4">Loading...</div>;
+  const openCreateModal = () => {
+    setEditingProduct(undefined);
+    open();
+  };
+
+  if (isLoading) return <div className="text-center p-4">Yuklanmoqda...</div>;
   if (error)
     return (
-      <div className="text-center p-4 text-red-600">Error loading products</div>
+      <div className="text-center p-4 text-red-600">
+        Mahsulotlarni yuklashda xato
+      </div>
     );
 
   return (
@@ -117,9 +170,9 @@ export const Products: React.FC = () => {
       <Button
         type="primary"
         className="mb-4 bg-blue-600 hover:bg-blue-700"
-        onClick={() => console.log("Open create modal")}
+        onClick={openCreateModal}
       >
-        Add Product
+        Mahsulot qo'shish
       </Button>
       <Table<DataType>
         columns={columns}
@@ -127,6 +180,31 @@ export const Products: React.FC = () => {
         className="bg-white rounded-lg shadow"
         pagination={{ pageSize: 10 }}
       />
+      <Modal
+        title={editingProduct ? "Mahsulotni yangilash" : "Mahsulot qo'shish"}
+        open={isOpen}
+        onCancel={close}
+        footer={null}
+      >
+        <ErrorBoundary>
+          <ProductForm
+            closeModal={close}
+            defaultValue={
+              editingProduct
+                ? {
+                    key: editingProduct.key,
+                    name: editingProduct.name,
+                    price: editingProduct.price,
+                    count: editingProduct.count,
+                    description: editingProduct.description,
+                    categoryId: editingProduct.categoryId,
+                    colorId: editingProduct.colorId,
+                  }
+                : undefined
+            }
+          />
+        </ErrorBoundary>
+      </Modal>
     </div>
   );
 };
