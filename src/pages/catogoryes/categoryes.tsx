@@ -13,11 +13,6 @@ interface dataSource {
   key?: string;
 }
 
-// interface TypeCategory {
-//   name: string;
-//   type: string;
-// }
-
 export const Categoryes = () => {
   const { data } = useGetCategoryes();
   const { isOpen, open, close } = useToggle();
