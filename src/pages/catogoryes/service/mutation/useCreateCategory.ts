@@ -9,9 +9,6 @@ type FieldType = {
 export const useCreateCategory = () => {
   return useMutation({
     mutationFn: (data: FieldType) =>
-      request
-        .post("/category", data)
-        .then((res) => res.data)
-        
+      request.post("/category", data).then((res) => res.data),
   });
 };

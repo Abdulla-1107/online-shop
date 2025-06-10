@@ -13,10 +13,10 @@ interface dataSource {
   key?: string;
 }
 
-interface TypeCategory {
-  name: string;
-  type: string;
-}
+// interface TypeCategory {
+//   name: string;
+//   type: string;
+// }
 
 export const Categoryes = () => {
   const { data } = useGetCategoryes();
@@ -38,7 +38,7 @@ export const Categoryes = () => {
     setInitialData(el);
     open2();
   };
-  const { mutate, isPending } = useDeleteCategory();
+  const { mutate } = useDeleteCategory();
   const client = useQueryClient();
 
   const deleteItems = (id: string) => {

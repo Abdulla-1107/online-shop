@@ -1,6 +1,6 @@
 import { request } from "../../../../config/request";
 import { useQuery } from "@tanstack/react-query";
-import type { categoryList, typesList } from "../../types";
+import type { typesList } from "../../types";
 
 export const useGetTypes = () => {
   return useQuery({
